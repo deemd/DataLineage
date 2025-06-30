@@ -36,24 +36,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         runId = data.get("run", {}).get("runId")
         notebookName = data.get("job", {}).get("name", "")
         facets = data.get("run", {}).get("facets", {})
-        spark_plan = facets.get("spark.logicalPlan")
-        className = None
-        if spark_plan:
-            if "plan" in spark_plan:
-                if spark_plan["plan"]:
-                    className = spark_plan["plan"][0].get("class")
-                else:
-                    logging.warning("Plan vide dans spark.logicalPlan")
-            else:
-                logging.warning("Clé 'plan' manquante dans spark.logicalPlan")
-
-        else:
-            className = data.get("className", None)
-
-            logging.warning("Pas de spark.logicalPlan")
-
-        logging.info(f"eventType={eventType}, className={className}, runId={runId}, notebookName={notebookName}")
-
+        
+        #logging.info(f"eventType={eventType}, className={className}, runId={runId}, notebookName={notebookName}")
+      
         if not notebookName:
             notebookName = "no_notebook"
 
@@ -62,17 +47,28 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         currenttimestamp = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
         fileName = f"{runId}_{notebookName}_{currenttimestamp}.json"
         filePath = f"{lineageContainer}/{fileName}"
-
-        predefined_class_list = [
-            "org.apache.spark.sql.execution.datasources.CreateTable",
-            "org.apache.spark.sql.catalyst.plans.logical.CreateViewStatement",
-            "org.apache.spark.sql.catalyst.plans.logical.CreateTableAsSelectStatement",
-            "org.apache.spark.sql.catalyst.plans.logical.InsertIntoStatement",
-            "org.apache.spark.sql.execution.datasources.SaveIntoDataSourceCommand",
-            "org.apache.spark.sql.catalyst.plans.logical.MergeIntoTable"
+        
+        job_name = data.get("job", {}).get("name", "").lower()
+        logging.info(f"Job Name: {job_name}")
+        """
+        # Motifs associés aux classes Spark recherchées
+        patterns = [
+        "create_table",
+        "create_view_statement",
+        "create_table_as_select_statement",
+        "insert_into_statement",
+        "save_into_data_source_command",
+        "merge_into_table"
+        "create_gold_table",
+        "create_silver_table",
+        "create_bronze_table",
         ]
-
-        if eventType == "COMPLETE" and className in predefined_class_list:
+        
+        found_patterns = [pattern for pattern in patterns if pattern in job_name]
+        logging.info(f"Patterns trouvés dans job_name : {found_patterns}")
+        and job_name and any(pattern in job_name for pattern in patterns)
+        """
+        if eventType == "COMPLETE" :
             try:
                 uploadblob(json.dumps(data), fileName, lineageContainerStr, lineageContainer)
                 logging.info(f"Blob upload OK : {filePath}")
@@ -94,7 +90,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             return func.HttpResponse("Func App successfully processed http request", status_code=200)
 
         else:
-            logging.info(f"Ignoré : eventType={eventType}, className={className}")
+            logging.info(f"Ignoré : eventType={eventType}")
             return func.HttpResponse("Event not COMPLETE or ClassName Not Matched", status_code=204)
 
     except Exception as e:
