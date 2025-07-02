@@ -14,50 +14,85 @@ def uploadblob(json_in, blobname, conn_str, lin_container):
     blob = BlobClient.from_connection_string(conn_str, container_name= lin_container, blob_name=blobname)
     BlobClient
     blob.upload_blob(json_in, overwrite=True)
+    
+    try:
+        blob.upload_blob(json_in, overwrite=True)
+    except Exception as blob_err:
+        logging.error(f"Blob upload failed: {blob_err}")
+        raise
 
 
 def main(req: func.HttpRequest) -> func.HttpResponse:
+    try:
+        logging.info("http trigger function kicked off")
 
-    logging.info("http trigger function kicked off")
+        lineageContainerStr = os.environ["LINEAGE_STORAGE_CONN_STR"]
+        lineageContainer = os.environ["LINEAGE_CONTAINER"]
 
-    lineageContainerStr = os.environ["LINEAGE_STORAGE_CONN_STR"]
-    lineageContainer = os.environ["LINEAGE_CONTAINER"]
+        data = req.get_json()
+        logging.info(f"Payload reçu : {json.dumps(data)[:500]}")  # Limité à 500 caractères
 
-    data = req.get_json()
-
-    currenttimestamp = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    eventType = data["eventType"]
-    className = data["run"]["facets"]["spark.logicalPlan"]["plan"][0]["class"]
-    runId = data["run"]["runId"]
-    notebookName = data["job"]["name"]
-    notebookName = notebookName[0 : notebookName.index('.')]
-    
-    fileName = runId + '_' + notebookName + '_' + currenttimestamp + '.json'
-    filePath = lineageContainer + '/' + fileName
-
-    predefined_class_list = ["org.apache.spark.sql.execution.datasources.CreateTable",
-                "org.apache.spark.sql.catalyst.plans.logical.CreateViewStatement",
-                "org.apache.spark.sql.catalyst.plans.logical.CreateTableAsSelectStatement",
-                "org.apache.spark.sql.catalyst.plans.logical.InsertIntoStatement",
-                "org.apache.spark.sql.execution.datasources.SaveIntoDataSourceCommand"]
-
-    if eventType is not None and eventType == "COMPLETE" and className in predefined_class_list :
-        # upload file as json into blob storage
-        uploadblob(json.dumps(data), fileName, lineageContainerStr, lineageContainer)
+        eventType = data.get("eventType")
+        runId = data.get("run", {}).get("runId")
+        notebookName = data.get("job", {}).get("name", "")
+        facets = data.get("run", {}).get("facets", {})
         
-        #code to add new unprocessed row for same uploaded json into azure table  
-        eventrow = event('HRSI', fileName)
-        eventrow.Status = 'Unprocessed'
-        eventrow.RetryCount = 3
-        eventrow.FilepPath = filePath
-        eventrow.isArchived = False
-        eventrow.Message = ''
+        #logging.info(f"eventType={eventType}, className={className}, runId={runId}, notebookName={notebookName}")
+      
+        if not notebookName:
+            notebookName = "no_notebook"
 
-        tableStorage = tablestorage()
-        tableStorage.insertEventMetadata(eventrow.__dict__)
+        notebookName = notebookName.split('.')[0]
 
-        return func.HttpResponse(f"Func App successfully processed http request")
+        currenttimestamp = dt.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        fileName = f"{runId}_{notebookName}_{currenttimestamp}.json"
+        filePath = f"{lineageContainer}/{fileName}"
+        
+        job_name = data.get("job", {}).get("name", "").lower()
+        logging.info(f"Job Name: {job_name}")
+        """
+        # Motifs associés aux classes Spark recherchées
+        patterns = [
+        "create_table",
+        "create_view_statement",
+        "create_table_as_select_statement",
+        "insert_into_statement",
+        "save_into_data_source_command",
+        "merge_into_table"
+        "create_gold_table",
+        "create_silver_table",
+        "create_bronze_table",
+        ]
+        
+        found_patterns = [pattern for pattern in patterns if pattern in job_name]
+        logging.info(f"Patterns trouvés dans job_name : {found_patterns}")
+        and job_name and any(pattern in job_name for pattern in patterns)
+        """
+        if eventType == "COMPLETE" :
+            try:
+                uploadblob(json.dumps(data), fileName, lineageContainerStr, lineageContainer)
+                logging.info(f"Blob upload OK : {filePath}")
+            except Exception as blob_err:
+                logging.error(f"Blob upload failed: {blob_err}")
+                return func.HttpResponse(f"Error uploading blob: {str(blob_err)}", status_code=500)
 
-    else:
+            # code to add row in table storage
+            eventrow = event('HRSI', fileName)
+            eventrow.Status = 'Unprocessed'
+            eventrow.RetryCount = 3
+            eventrow.FilepPath = filePath
+            eventrow.isArchived = False
+            eventrow.Message = ''
 
-        return func.HttpResponse(f"Event Type is not COMPLETE Or ClassName Not Matched")
+            tableStorage = tablestorage()
+            tableStorage.insertEventMetadata(eventrow.__dict__)
+
+            return func.HttpResponse("Func App successfully processed http request", status_code=200)
+
+        else:
+            logging.info(f"Ignoré : eventType={eventType}")
+            return func.HttpResponse("Event not COMPLETE or ClassName Not Matched", status_code=204)
+
+    except Exception as e:
+        logging.error(f"Error processing request: {e}")
+        return func.HttpResponse(f"Error: {str(e)}\nPayload: {req.get_body()}", status_code=500)
