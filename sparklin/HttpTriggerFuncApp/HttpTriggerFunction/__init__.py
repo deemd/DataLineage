@@ -50,7 +50,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         job_name = data.get("job", {}).get("name", "").lower()
         logging.info(f"Job Name: {job_name}")
-        """
+        
+        # """
         # Motifs associés aux classes Spark recherchées
         patterns = [
         "create_table",
@@ -66,9 +67,10 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         found_patterns = [pattern for pattern in patterns if pattern in job_name]
         logging.info(f"Patterns trouvés dans job_name : {found_patterns}")
-        and job_name and any(pattern in job_name for pattern in patterns)
-        """
-        if eventType == "COMPLETE" :
+        # and job_name and any(pattern in job_name for pattern in patterns)
+        # """
+        
+        if eventType == "COMPLETE" and job_name and any(pattern in job_name for pattern in patterns):
             try:
                 uploadblob(json.dumps(data), fileName, lineageContainerStr, lineageContainer)
                 logging.info(f"Blob upload OK : {filePath}")
