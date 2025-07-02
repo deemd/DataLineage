@@ -1,0 +1,12 @@
+{
+  "scriptFile": "__init__.py",
+  "bindings": [
+    {
+      "name": "blob",
+      "type": "blobTrigger",
+      "direction": "in",
+      "path": "openlineage/{name}",
+      "connection": "LINEAGE_STORAGE_CONN_STR"
+    }
+  ]
+}
