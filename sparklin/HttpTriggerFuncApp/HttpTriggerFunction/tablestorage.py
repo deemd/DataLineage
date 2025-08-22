@@ -4,8 +4,8 @@ from azure.data.tables import TableServiceClient
 class tablestorage:
     
     def __init__(self) -> None:
-        self.connstr = os.environ["LINEAGE_STORAGE_CONN_STR"]
-        self.tablename = os.environ["LINEAGE_EVENT_TABLE"]
+        self.connstr = os.environ["LINEAGE_RECEIVER_STORAGE_CONN_STR"]
+        self.tablename = os.environ["EVENT_METADATA_TABLE"]
 
 
         self.table_service_client = TableServiceClient.from_connection_string(self.connstr)

@@ -26,8 +26,8 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     try:
         logging.info("http trigger function kicked off")
 
-        lineageContainerStr = os.environ["LINEAGE_STORAGE_CONN_STR"]
-        lineageContainer = os.environ["LINEAGE_CONTAINER"]
+        lineageContainerStr = os.environ["LINEAGE_RECEIVER_STORAGE_CONN_STR"]
+        lineageContainer = os.environ["EVENT_LINEAGE_CONTAINER"]
 
         data = req.get_json()
         logging.info(f"Payload reçu : {json.dumps(data)[:500]}")  # Limité à 500 caractères
@@ -50,7 +50,7 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         job_name = data.get("job", {}).get("name", "").lower()
         logging.info(f"Job Name: {job_name}")
-        """
+        
         # Motifs associés aux classes Spark recherchées
         patterns = [
         "create_table",
@@ -66,9 +66,9 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
         
         found_patterns = [pattern for pattern in patterns if pattern in job_name]
         logging.info(f"Patterns trouvés dans job_name : {found_patterns}")
-        and job_name and any(pattern in job_name for pattern in patterns)
-        """
-        if eventType == "COMPLETE" :
+        
+        
+        if eventType == "COMPLETE" and job_name and any(pattern in job_name for pattern in patterns) :
             try:
                 uploadblob(json.dumps(data), fileName, lineageContainerStr, lineageContainer)
                 logging.info(f"Blob upload OK : {filePath}")

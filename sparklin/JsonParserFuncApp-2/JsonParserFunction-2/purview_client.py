@@ -3,11 +3,6 @@ import requests
 import logging
 
 class PurviewClient:
-    """A client to interact with Azure Purview API for lineage creation.
-
-    This class authenticates via client credentials and issues HTTP requests
-    to the Purview API to create lineage relationships between datasets and notebooks.
-    """
     
     def __init__(self):
         """Initialize the Purview client with credentials from environment variables.
@@ -50,20 +45,8 @@ class PurviewClient:
         return response.json()["access_token"]
     
     def create_lineage(self, source_guid, source_type, target_guid, target_type, workspace_id, direction):
-        """Create a lineage relationship in Azure Purview between a source and target entity.
-
-        Args:
-            source_guid (str): The GUID of the source dataset or process.
-            source_type (str): The entity type of the source (e.g., fabric_lakehouse).
-            target_guid (str): The GUID of the target dataset or process.
-            target_type (str): The entity type of the target (e.g., fabric_synapse_notebook).
-            workspace_id (str): Azure workspace ID for constructing qualified names.
-            direction (str): Either 'input' or 'output' indicating lineage direction.
-
-        Returns:
-            tuple: A tuple containing (status_code, response_text) from the API call.
-        """
-        logging.info("[purviewclient.py] Lineage creation request initiated.")
+        # DEBUG
+        logging.info("@PURVIEW_CLIENT - [BEGIN] PURVIEW_CLIENT.PY")
         
         headers = {
             "Authorization": f"Bearer {self.token}",
@@ -91,16 +74,29 @@ class PurviewClient:
             }
         }
         
-        logging.info("[purviewclient.py] Try sending lineage creation request.")
-        response = requests.post(f"{self.api_url}/datamap/api/atlas/v2/relationship", headers=headers, json=payload)
+        url = f"{self.api_url}/datamap/api/atlas/v2/relationship"
+        logging.info(f"@PURVIEW_CLIENT - Sending lineage {direction.upper()} to Purview...")
+        response = requests.post(url, headers=headers, json=payload)
+        
+        # DEBUG # BUG
+        logging.info(f"@PURVIEW_CLIENT - Response API REST Purview: {response}")
         
         if response.status_code in (200, 201):
-            logging.info(f"[purviewclient.py] Lineage {direction.upper()} created successfully.")
+            logging.info(f"@PURVIEW_CLIENT - Lineage {direction.upper()} created successfully.")
         elif response.status_code == 409:
-            logging.info(f"[purviewclient.py] Lineage {direction.upper()} already exists. No action taken.")
+            logging.info(f"@PURVIEW_CLIENT - Lineage {direction.upper()} already exists. No action taken.")
         else:
-            logging.error(f"[purviewclient.py] [ERROR] {direction.upper()} lineage failed: {response.status_code} - {response.text}")
+            logging.error(f"@PURVIEW_CLIENT - [ERROR] {direction.upper()} lineage failed: {response.status_code} - {response.text}")
             response.raise_for_status()
+        
+        # DEBUG
+        logging.info("@PURVIEW_CLIENT - Lineage creation completed.")
+        
+        # DEBUG
+        logging.info("@PURVIEW_CLIENT - [END] PURVIEW_CLIENT.PY")
+        
+        # DEBUG
+        logging.info("@PURVIEW_CLIENT - [RETURN CALL] PURVIEW_CLIENT.PY")
         
         return response.status_code, response.text
 
